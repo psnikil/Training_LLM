@@ -1,0 +1,10 @@
+llm_trainer/
+data/
+models/
+*.env
+datasets_cache/
+diffusion_checkpoints/
+
+
+diffusion_16gb_guide.md
+diffusion_llm_guide.md
