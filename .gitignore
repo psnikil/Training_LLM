@@ -1,10 +1,11 @@
 llm_trainer/
+train_llm/
 data/
 models/
 *.env
 datasets_cache/
 diffusion_checkpoints/
-
+cuda-keyring_1.1-1_all.deb
 
 diffusion_16gb_guide.md
 diffusion_llm_guide.md

@@ -5,6 +5,7 @@ import json
 from datasets import load_dataset, concatenate_datasets
 import random
 from pathlib import Path
+from transformers import AutoTokenizer
 
 def prepare_training_dataset(
     output_dir: str = "./data/training",
@@ -87,18 +88,23 @@ def create_tokenized_dataset(
         output_path: Where to save tokenized data
     """
     
-    from transformers import AutoTokenizer
+
     
     print(f"[1/4] Loading tokenizer from {model_name}...")
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    tokenizer = AutoTokenizer.from_pretrained(model_name, use_fast=True)
+
+    # move to cuda
+    # tokenizer.to('cuda')
     
     # Add padding token if missing
-    if tokenizer.pad_token is None:
-        tokenizer.pad_token = tokenizer.eos_token
+    # if tokenizer.pad_token is None:
+    tokenizer.pad_token = " "
     
     print(f"[2/4] Loading datasets from {dataset_path}...")
     train_dataset = load_dataset("arrow", data_files=f"{dataset_path}/train/data-00000-of-00001.arrow")['train']
     test_dataset = load_dataset("arrow", data_files=f"{dataset_path}/test/data-00000-of-00001.arrow")['train']
+    print(f"the columns are {train_dataset.column_names}")
+    print(f"the columns are {test_dataset.column_names}")
 
 
     # 2. Define how to build the text you want to tokenize
@@ -107,7 +113,7 @@ def create_tokenized_dataset(
         problem = example["problem"]
         solution = example["generated_solution"]
         expected_ans = example["expected_answer"]
-        text = f"Question:\n{problem}\n\nAnswer:\n{solution}\n\nExpected Answer:\n{expected_ans}\n"
+        text = f"Question:\n{problem}\n\nSolution:\n{solution}\n\nExpected Answer:\n{expected_ans}\n"
         return {"text": text}
 
     formatted_train = train_dataset.map(
@@ -120,9 +126,13 @@ def create_tokenized_dataset(
         remove_columns=test_dataset.column_names
     )
 
+    # print(f"the formatted columns of len are:{type(formatted_train["text"])} and \n data is: {formatted_train["text"][0]}")
+    # print(f"the formatted columns of len are:{len(formatted_test["text"])} and \n data is: {formatted_test["text"]}")
+
     
     def tokenize_function(examples,key='text'):
         """Tokenize text examples."""
+        # print(f"Tokenizing examples for key: {type(list(examples[key])[0])}")
         return tokenizer(
             examples[key],
             truncation=True,
@@ -131,11 +141,19 @@ def create_tokenized_dataset(
             return_tensors=None
         )
     
+    # print(f"the tokenised data is {tokenize_function(formatted_train)}")
+    
     def group_texts(examples):
         """Group tokenized text into fixed-size chunks."""
         # tokens = tokenize_function(examples,key='text')
+        # print(f"Examples keys: {list(examples.keys())} \n and the len of the values are {[len(examples[k]) for k in examples.keys()]}")
+        # print(f"Examples keys: {[sum(examples[k],[]) for k in examples.keys()]} \n and len is {([len(examples[k]) for k in examples.keys()])}")
         concatenated_examples = {k: sum(examples[k], []) for k in examples.keys()}
-        print(f"Concatenated length: {len(concatenated_examples[list(examples.keys())[0]])}")
+        # print(f"Concatenated length 1: {len(concatenated_examples[list(examples.keys())[0]])}")
+        # print(f"Concatenated length 2: {len(concatenated_examples[list(examples.keys())[1]])}")
+
+        # print(f"Concatenated length 3: {len(concatenated_examples[list(examples.keys())[2]])}")
+
         total_length = len(concatenated_examples[list(examples.keys())[0]])
         total_length = (total_length // block_size) * block_size
         
@@ -172,6 +190,10 @@ def create_tokenized_dataset(
         num_proc=8,
         desc="Grouping training data"
     )
+    print(f"the grouped train dataset keys are {grouped_train.column_names} ")
+    print(f"the grouped train dataset input ids are {grouped_train['input_ids']} ")
+
+
     
     grouped_test = tokenized_test.map(
         group_texts,
@@ -192,6 +214,7 @@ def create_tokenized_dataset(
 
 if __name__ == "__main__":
     # Step 1: Download and prepare dataset
+    # print(f'Starting dataset download')
     # prepare_training_dataset(
     #     output_dir="./data/training",
     #     sample_size=100_000,  # Start small for testing
@@ -199,6 +222,7 @@ if __name__ == "__main__":
     # )
     
     # Step 2: Tokenize and create training data
+    print(f"creating tokenized dataset")
     create_tokenized_dataset(
         dataset_path="./data/training",
         model_name="TinyLlama/TinyLlama_v1.1",
