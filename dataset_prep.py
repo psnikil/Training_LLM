@@ -95,7 +95,8 @@ def tokenize_multi_files(
     print(f"[1/4] Loading tokenizer for {task} from {model_name}...")
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     total_len_data = 0
-    tokenizer.pad_token = " "
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
     # parsing through only the *.arrow the files in the dataset path
     for file in os.listdir(dataset_path):
         if not file.endswith(".arrow"):
